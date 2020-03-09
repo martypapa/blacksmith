@@ -1,49 +1,159 @@
-# blacksmith
+# Blacksmith
 
 A c++17 single header library for constructing and building classes inline.
 
 ## Overview
 
-Build a local class:
+Initialize a class and modify it in-place:
+
 ```cpp
-Point p = build([](Point& _) { _.x = 5; _.y = 6;});
+// Returns a Label with size: 200 x 50, and text: "Ok"
+build([](Label& _){ _.set_size(200, 50); }, "Ok");
 ```
 
-Construct a `shared_ptr`, `unique_ptr` or raw pointer:
+Or directly create a new raw or smart pointer
 ```cpp
-std::shared_ptr<Point> p = build_shared([](Point& _) { _.x = 5; _.y = 6;});
-std::unique<Point> p = build_unique([](Point& _) { _.x = 5; _.y = 6;});
-Point* p = build_new([](Point& _) { _.x = 5; _.y = 6;}); // ... delete point;
+// Returns a new Label*
+build_new([](Label& _){...}, "Ok");
+
+// Returns a std::shared_ptr<Label>
+build_shared([](Label& _){...}, "Ok");
+
+// Returns a std::unique_ptr<Label>
+build_unique([](Label& _){...}, "Ok");
 ```
 
-All `build` functions are `constexpr` and are optimised away by the compiler.
 
 ## Why?
 
+We want to construct a widget with a button inside.
+
+Standard approach:
 ```cpp
-Point point1;
-point1.setX(1);
-point1.setY(2);
-point1.setZ(3);
+auto widget = new Widget();
+widget->set_color({255, 0, 0});
 
-Point point2;
-point2.setX(4);
-point1.setY(5); // <-- Oops!! See what we did here?
-point2.setZ(6);
+auto btn_add = new Button("+");
+btn_add->set_action(Action::Add);
+widget->add_child(button1);
 
-drawLine(point1, point2);
+auto btn_subtract = new Button("-");
+btn_add->set_action(Action::Subtract);
+widget->add_child(btn_subtract);
 ```
 
-If we use *blacksmith* instead:
+**Blacksmith** approach:
 ```cpp
-drawLine(build([](Point&_) { _.setX(1), _.setY(2), _.setZ(3); }),
-            build([](Point&_) { _.setX(4), _.setY(5), _.setZ(6); }));
+auto widget = build_new([](Widget& _) { 
+    _.set_color({255, 0, 0}); 
+    _.add_child(build_new([](Button& _) {
+        _.set_action(Action::Add);
+    }, "+"));
+    _.add_child(build_new([](Button& _) {
+        _.action = Action::Subtract;
+    }, "-"));
+});
 ```
-By using the `build` function, we avoided the possibility of accidentally setting the wrong named variable!
-All variables are now scoped locally and constructed in-place!
+
+Did you spot the mistake in the first approach? This one is hard to detect later on!
+
+```cpp
+    auto btn_subtract = new Button("-");
+    btn_add->set_action(Action::Subtract);
+//  ^^^^^^^ this should be btn_subtract
+    widget->add_child(btn_subtract);
+```
+
+**Blacksmith** aims to eliminate this type of error by encouraging a more declarative style of programming.
 
 
-## Example
+
+## Features
+
+
+* Only write the type once! And don't worry about thinking of a unique variable name.
+```cpp
+build([](Widget& _) { ... });
+         ^^^^^^  ^
+```
+
+* Trailing arguments are forwarded to the constructor
+```cpp
+build([](Label& _) { ... }, "Hello, world");
+                            ^^^^^^^^^^^^^^
+```
+
+* All `build` functions are `constexpr` and are optimized away by the compiler.
+
+* Build functions can accept a reference or the actual type
+```cpp
+build_shared([](Label& _) {...}); // Ok
+                ^^^^^^
+build_shared([](const std::shared_ptr<Label>& _) {...}); // Ok
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+
+# Examples
+
+## Comparison of GUI Construction
+
+### Without Blacksmith
+```cpp
+auto layout = std::make_shared<Layout>(LayoutDirection::Vertical);
+auto outer_widget = std::make_shared<Widget>();
+outer_widget->set_background({255, 255, 255});
+outer_widget->set_padding(4);
+outer_widget->set_size(100, 100);
+
+auto inner_layout = std::make_shared<Layout>(LayoutDirection::Horizontal);
+
+auto inner_label = std::make_shared<Label>("Red Box");
+inner_label->set_background({255, 255, 255});
+inner_label->set_size(300, 50);
+inner_layout->add_child(inner_label);
+
+auto inner_box = std::make_shared<Widget>();
+inner_box->set_background({255, 0, 0});
+inner_box->set_size(50, 50);
+
+outer_widget->set_layout(inner_layout);
+
+layout->add_child(outer_widget);
+draw_layout(layout);
+```
+
+### With Blacksmith
+```cpp
+using namespace blacksmith;
+draw_layout(build_shared(
+    [](Layout &_) {
+        _.add_child(build_shared([](Widget &_) {
+            _.set_background({255, 255, 255});
+            _.set_padding(4);
+            _.set_size(100, 100);
+            _.set_layout(build_shared(
+                [](Layout &_) {
+                    _.add_child(build_shared(
+                        [](Label &_) {
+                            _.set_background({255, 255, 255});
+                            _.set_size(300, 50);
+                        },
+                        "Red Box"));
+                    _.add_child(build_shared([](Widget &_) {
+                        _.set_background({255, 0, 0});
+                        _.set_size(50, 50);
+                    }));
+                },
+                LayoutDirection::Horizontal));
+        }));
+    },
+    LayoutDirection::Vertical));
+```
+
+
+
+## Usage of all build functions
 
 ```cpp
 #include <string>
