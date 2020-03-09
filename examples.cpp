@@ -1,55 +1,6 @@
-# blacksmith
-
-A c++17 single header library for constructing and building classes inline.
-
-## Overview
-
-Build a local class:
-```cpp
-Point p = build([](Point& _) { _.x = 5; _.y = 6;});
-```
-
-Construct a `shared_ptr`, `unique_ptr` or raw pointer:
-```cpp
-std::shared_ptr<Point> p = build_shared([](Point& _) { _.x = 5; _.y = 6;});
-std::unique<Point> p = build_unique([](Point& _) { _.x = 5; _.y = 6;});
-Point* p = build_new([](Point& _) { _.x = 5; _.y = 6;}); // ... delete point;
-```
-
-All `build` functions are `constexpr` and are optimised away by the compiler.
-
-## Why?
-
-```cpp
-Point point1;
-point1.setX(1);
-point1.setY(2);
-point1.setZ(3);
-
-Point point2;
-point2.setX(4);
-point1.setY(5); // <-- Oops!! See what we did here?
-point2.setZ(6);
-
-drawLine(point1, point2);
-```
-
-If we use *blacksmith* instead:
-```cpp
-drawLine(build([](Point&_) { _.setX(1), _.setY(2), _.setZ(3); }),
-            build([](Point&_) { _.setX(4), _.setY(5), _.setZ(6); }));
-```
-By using the `build` function, we avoided the possibility accidentally setting the wrong variable!
-All variables are scoped locally and build in-place!
-
-
-## Example
-
-```cpp
 #include <string>
 #include <vector>
 #include "blacksmith.h"
-
 struct Pet
 {
     std::string species;
@@ -120,4 +71,22 @@ int main()
             }),
         }};
     });
-```
+
+    assert(owner.age == 42);
+    build_on(owner, [](Person &_) { _.age = 43; });
+    assert(owner.age == 43);
+    build_on(&owner, [](Person *_) { _->age = 44; });
+    assert(owner.age == 44);
+    build_on(&owner, [](Person &_) { _.age = 45; });
+    assert(owner.age == 45);
+
+    assert(owner.first_name == "Jon");
+    assert(owner.last_name == "Doe");
+    assert(owner.local_pets[0].full_name() == "Cricket Bat");
+    assert(owner.shared_pets[0]->full_name() == "Smelly Cat");
+    assert(owner.shared_pets[1]->full_name() == "Hot Dog");
+    assert(owner.unique_pets[0]->full_name() == "Copy Cat");
+    assert(owner.unique_pets[1]->full_name() == "Bob Cat");
+    assert(owner.raw_owned_pets[0]->full_name() == "Arya Chicken");
+    assert(owner.raw_owned_pets[1]->full_name() == "Hairy Otter");
+}
