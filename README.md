@@ -39,8 +39,8 @@ If we use *blacksmith* instead:
 drawLine(build([](Point&_) { _.setX(1), _.setY(2), _.setZ(3); }),
             build([](Point&_) { _.setX(4), _.setY(5), _.setZ(6); }));
 ```
-By using the `build` function, we avoided the possibility accidentally setting the wrong variable!
-All variables are scoped locally and build in-place!
+By using the `build` function, we avoided the possibility of accidentally setting the wrong named variable!
+All variables are now scoped locally and constructed in-place!
 
 
 ## Example
